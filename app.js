@@ -24,7 +24,7 @@ app.use(bodyParser.json())
 connectMongoDB()
 
 app.use("/api/v1", userRouter)
-app.use("/api/v1", taskRoute)
+app.use("/api/v1/task", taskRoute)
 app.use("/api/v1", userTypeRoute)
 
 app.use("*", (req, res, next) => {
