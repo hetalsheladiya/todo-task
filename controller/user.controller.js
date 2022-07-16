@@ -4,13 +4,14 @@ const UserTypeModel = require("./../models/usertype.model")
 const ErrorHandler = require("../utils/ErrorHandler");
 const { validationResult } = require("express-validator");
 const sendToken = require('../utils/jwtToken');
+const userService = require("./../utils/UserService")
 
 module.exports = {    
     register: async(req, res, next) => {
         try {
             const error = validationResult(req);            
             if(!error.isEmpty()) {
-                return res.status(400).json({success: false, error: error.errors})
+                return res.status(400).json({success: false, errors: error.errors})
             }
             else {
                 const {username, email, password, usertype } = req.body;                     
@@ -35,16 +36,19 @@ module.exports = {
         try {
             const error = validationResult(req);            
             if(!error.isEmpty()) {
-                res.status(400).json({success: false, error: error.errors})
+                return res.status(400).json({success: false, errors: error.errors})
             }
             else {
                 let {email, password } = req.body;                
                 let regex = new RegExp(['^',email,'$'].join(""),"i");
-                let user = await userModel.findOne({email: regex}).select("password");                    
-                if(user && await bcryptjs.compare(password, user.password)) 
-                    sendToken(user, 200, res)                
+                let user = await userModel.findOne({email: regex}).select("username password").populate('usertype','usertype');                    
+                if(user && await bcryptjs.compare(password, user.password)) {
+                    user.password = undefined;
+                    delete user.password;
+                    sendToken(user, 200, res)  
+                }              
                 else 
-                    res.status(400).json({success: false, error: "Invalid Credentials"})               
+                    return res.status(400).json({success: false, errors: "Invalid Credentials"})               
             }
         }
         catch(e) {
@@ -64,15 +68,36 @@ module.exports = {
         try {            
             const error = validationResult(req);           
             if(!error.isEmpty()) {
-                res.status(400).json({success: false, error: error.errors})
+                return res.status(400).json({success: false, errors: error.errors})
             }
             else {
-                const { userId } = req.query;                
-                res.status(200).json({
-                    success: true,
-                    message: `User successfully deleted`
-                })
+                const { userId } = req.params;    
+                const data = await userService.deleteUser(userId);
+                if(data)                
+                    return res.status(200).json({
+                        success: true,
+                        message: `User successfully deleted`
+                    })
+                else 
+                    throw new ErrorHandler('Faile! Error occured while deleeting user', 400)
             }
+        }
+        catch(e) {
+            next(e)
+        }
+    },
+    userList: async(req, res, next) => {
+        try {            
+            const error = validationResult(req);           
+            if(!error.isEmpty()) {
+                return res.status(400).json({success: false, errors: error.errors})
+            }
+            const { _id } = req.user;
+            const data = await userService.listOfUser(_id);
+            return res.status(200).json({
+                success: true,
+                data: data
+            })
         }
         catch(e) {
             next(e)

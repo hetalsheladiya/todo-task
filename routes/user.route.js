@@ -1,7 +1,7 @@
 const express = require('express');
 const userRouter = express.Router();
 const { check } = require('express-validator');
-const { register, login, logout, deleteUser } = require('../controller/user.controller');
+const { register, login, logout, deleteUser, userList } = require('../controller/user.controller');
 const { isAuthorized, isAdminAuthorized } = require('../middleware/auth');
 const UserService = require("../utils/UserService")
 
@@ -38,10 +38,10 @@ userRouter.route("/login").post([
 
 userRouter.route("/logout").get(logout)
 
-userRouter.route("/delete").delete(
-    isAuthorized, 
-    isAdminAuthorized, 
-    [check('userId').not().isEmpty().withMessage(`Please provide user id`)],
-    deleteUser)
+userRouter.route("/user-delete/:userId").delete(isAuthorized, isAdminAuthorized, [
+    check('userId').not().isEmpty().withMessage(`Please provide user id`)
+], deleteUser)
+
+userRouter.route("/user-list").get(isAuthorized, isAdminAuthorized, userList)
 
 module.exports = userRouter

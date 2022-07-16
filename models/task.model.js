@@ -10,7 +10,11 @@ const taskSchema = mongooose.Schema({
     },    
     status: {
         type: Number,
-        default: 0  // 0 for pending , 1 for completed
+        default: 0  // 0 for pending, 1 for completed
+    },
+    assignedTo: {
+        type: mongooose.Schema.Types.ObjectId,
+        ref: 'user'
     },
     is_deleted: {
         type: Boolean,

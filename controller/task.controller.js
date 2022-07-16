@@ -1,7 +1,7 @@
 const { validationResult } = require("express-validator");
 const taskModel = require("../models/task.model");
 const ErrorHandler = require("../utils/ErrorHandler");
-const { checkTask } = require("../utils/task");
+const { checkTask, taskList } = require("../utils/task");
 
 module.exports = {
     addTask: async (req, res, next) => {
@@ -38,8 +38,13 @@ module.exports = {
             if(!errors.isEmpty()) {
                 return res.status(400).json({success: false, errors: errors.errors})
             }            
-            const { _id } = req.user;                       
-            let data = await taskModel.find({userId: _id, is_deleted: false});
+            const { _id, usertype } = req.user; 
+            console.log(req.user); 
+            if(usertype.usertype.indexOf('user') > -1)
+                $query = {$or: [{userId: _id},{assignedTo: _id}], is_deleted: false} 
+            else 
+                $query = {is_deleted: false}                     
+            const data = await taskList($query);
             return res.status(200).json({
                 success: true, 
                 data: data
@@ -56,11 +61,16 @@ module.exports = {
                 return res.status(400).json({success: false, errors: errors.errors})
             }            
             const { taskId } = req.params;
-            let data = await taskModel.updateOne({_id: taskId}, {is_deleted: true});
-            if(data.modifiedCount == 0) {
+            const { _id, usertype } = req.user;
+            if(usertype.usertype.indexOf('user') > -1)
+                $query = await taskModel.updateOne({_id: taskId, userId: _id},{is_deleted: true})
+            else {
+                $query = await taskModel.updateOne({_id: taskId}, {is_deleted: true})
+            }
+            if($query.modifiedCount == 0) {
                 throw new ErrorHandler(`Failed! Error occured while deleting task`, 400)
             }
-            return res.status(200).json({success: true,  message: `Task Deleted`, data: data})            
+            return res.status(200).json({success: true,  message: `Task Deleted`, data: $query})            
         }
         catch(e) {
             next(e)
@@ -73,12 +83,16 @@ module.exports = {
                 return res.status(400).json({success: false, errors: errors.errors})
             }            
             const { task, taskId } = req.body;
+            const { _id, usertype } = req.user;
             $query = {
-                task: new RegExp(["^", task, "$"].join(""),"i"), 
-                _id: {$nin: [taskId]}, 
-                userId: req.user._id,
+                task: new RegExp(["^", task, "$"].join(""),"i"),
+                _id: {$nin: [taskId]},                     
                 is_deleted: false
-            }
+            }            
+            if(usertype.usertype.indexOf('user') > -1) 
+                $query['userId'] = _id;
+                
+            console.log($query);
             let getTask = await taskModel.findOne($query);            
             if(getTask) {
                 throw new ErrorHandler(`Failed! Task already exist`, 400)
@@ -105,6 +119,24 @@ module.exports = {
                 throw new ErrorHandler(`Failed! Error occured while updating status`, 400)
             }
             return res.status(200).json({success: true, data: data, message: `Task Status Updated`})  
+        }
+        catch(e) {
+            next(e)
+        }
+    },
+    assignTask: async(req, res, next) => {
+        try {
+            const errors = validationResult(req);            
+            if(!errors.isEmpty()) {
+                return res.status(400).json({success: false, errors: errors.errors})
+            }
+            const { taskId, userId } = req.body;
+            const data = await taskModel.findByIdAndUpdate(taskId, {assignedTo: userId}, {new: true}).populate("assignedTo", 'username');            
+            return res.status(200).json({
+                success: true,
+                data: data,
+                message: `Task is assigned to ${data.assignedTo.username}`
+            })
         }
         catch(e) {
             next(e)
